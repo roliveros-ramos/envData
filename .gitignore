@@ -17,10 +17,6 @@
 # RStudio files
 .Rproj.user/
 
-# produced vignettes
-vignettes/*.html
-vignettes/*.pdf
-
 # OAuth2 token, see https://github.com/hadley/httr/releases/tag/v0.3
 .httr-oauth
 
@@ -31,3 +27,14 @@ vignettes/*.pdf
 # Temporary files created by R markdown
 *.utf8.md
 *.knit.md
+
+# netCDF data files
+*.nc
+*.nc4
+*.h5
+*.hdf
+
+# vim security files
+*~
+
+.Rproj.user
