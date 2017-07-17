@@ -1,7 +1,8 @@
 library(kali)
 library(ncdf4)
+source("auxiliar_functions.R")
 
-years = 2015:2000
+years = 1980
 output = "raw/soda"
 
   
