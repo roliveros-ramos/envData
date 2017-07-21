@@ -218,6 +218,7 @@ get_oisst = function(year, month, output=NULL, type="avhrr-only",
 download_soda = function(year, output, version = "3.3.1",
                          server = "http://dsrs.atmos.umd.edu") {
   
+  if(!dir.exists(output)) dir.create(output, recursive = TRUE)
   path = sprintf("DATA/soda%s/REGRIDED", version) 
   file = sprintf("soda%s_mn_ocean_reg_%d.nc", version, year)
   url = file.path(server, path, file)
