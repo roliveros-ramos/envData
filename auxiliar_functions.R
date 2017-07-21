@@ -230,3 +230,13 @@ download_soda = function(year, output, version = "3.3.1",
   
 }
 
+.getBottom = function(x) {
+  out = na.omit(x)
+  if(length(out)==0) return(NA)
+  return(tail(out, 1))
+}
+
+.getBottomC = function(x) {
+  out = na.omit(x)
+  return(length(out))
+}
