@@ -1,37 +1,4 @@
 
-# Generic ncdf auxiliar functions -----------------------------------------
-
-
-#' Get all variable's attributes from a ncdf object 
-#'
-#' @param nc An open connection to a netCDF file as in nc_open(file).
-#' @param type A character to choose attributes for variables ("var") 
-#' or dimensions ("dim").
-#' @return A list with all the atributes.
-#' @export
-#'
-#' @examples
-ncatt_get_all = function(nc, type=c("var", "dim")) {
-  type = match.arg(type)
-  vars = names(nc[[type]])
-  names(vars) = vars
-  atts = lapply(vars, FUN=function(var) ncatt_get(nc, var))
-  return(atts)
-}
-
-#' Get the dimensions of the variables in a ncdf object.
-#'
-#' @param nc An open connection to a netCDF file as in nc_open(file).
-#'
-#' @return A named list with the dimensions of the variables.
-#' @export
-#'
-#' @examples
-ncdim_size = function(nc) {
-  lapply(nc$dim, function(x) x$len)
-}
-
-
 # get Data ----------------------------------------------------------------
 
 # OI SST
@@ -59,7 +26,9 @@ get_oisst = function(year, month, output=NULL, type="avhrr-only",
                          server="https://www.ncei.noaa.gov/data",
                          prec = "float", compression = 9,
                          allDays = FALSE, temp=NULL) {
-  
+
+  # add day argument, different behaviour for year, month and day
+  # sea ice?  
   if(is.null(output)) output = getwd()
   
   var1   = "sea-surface-temperature-optimum-interpolation"
@@ -118,7 +87,7 @@ get_oisst = function(year, month, output=NULL, type="avhrr-only",
   dimLon   = ncdim_def("lon", dimAtts$lon$units, vals=lon)
   dimLat   = ncdim_def("lat", dimAtts$lat$units, vals=lat)
   dimZlev  = ncdim_def("zlev", dimAtts$zlev$units, zlev)
-  dimTime  = ncdim_def("time", dimAtts$time$units, time)
+  dimTime  = ncdim_def("time", dimAtts$time$units, time, unlim = TRUE)
   
   # create variables
   
@@ -167,7 +136,7 @@ get_oisst = function(year, month, output=NULL, type="avhrr-only",
   
   if(isTRUE(allDays)) {
     
-    dimTimes = ncdim_def("time", dimAtts$time$units, times)
+    dimTimes = ncdim_def("time", dimAtts$time$units, times, unlim = TRUE)
     
     fSST   = ncvar_def(name="sst", units=varAtts$sst$units, 
                        dim=list(dimLon, dimLat, dimZlev, dimTimes), 
@@ -201,7 +170,9 @@ get_oisst = function(year, month, output=NULL, type="avhrr-only",
   
 }
 
-# SODA
+
+# SODA: Simple Ocean Data Assimilation ------------------------------------
+
 
 #' Download SODA (Simple Ocean Data Assimilation) yearly files
 #'
@@ -214,30 +185,116 @@ get_oisst = function(year, month, output=NULL, type="avhrr-only",
 #' @return 
 #' @export
 #'
-#' @examples
-download_soda = function(year, output, version = "3.3.1",
-                         server = "http://dsrs.atmos.umd.edu") {
+#' @examples download_soda(year=2015)
+download_soda = function(year, output=NULL, version = "3.3.1",
+                         server = "http://dsrs.atmos.umd.edu",
+                         overwrite=FALSE) {
   
-  if(!dir.exists(output)) dir.create(output, recursive = TRUE)
+  if(is.null(output)) output = getwd()
   path = sprintf("DATA/soda%s/REGRIDED", version) 
   file = sprintf("soda%s_mn_ocean_reg_%d.nc", version, year)
   url = file.path(server, path, file)
+  
+  if(file.exists(file.path(output, file)) & !isTRUE(overwrite)) {
+    message(sprintf("File %s already exists, skipping download (overwrite=FALSE).", 
+                    file.path(output, file)))
+    return(invisible(file.path(output, file)))
+  }
+  
+  if(!dir.exists(output)) dir.create(output, recursive = TRUE)
+  
   DateStamp(sprintf("Getting SODA %s data for %d", version, year))
   try(download.file(url=url, destfile = file.path(output, file),
                     method="libcurl", quiet=FALSE, mode = "wb", 
                     cacheOK = FALSE))
   
-  return(invisible())
+  return(invisible(file.path(output, file)))
   
 }
+
+
+#' SODA processing for 2D data extraction
+#'
+#' @param file SODA data file
+#' @param output Output folder for processed file
+#' @param compression netCDF 4 compression level, default=9 (maximum)
+#'
+#' @return
+#' @export
+#'
+#' @examples
+process_soda = function(file, output, compression=9) {
+  
+  nc = nc_open(file)
+  # just get what you need
+  depth = ncvar_get(nc, "depth")
+  temp = ncvar_get(nc, "temp")
+  salt = ncvar_get(nc, "salt")
+  
+  # new variables
+  vals = list()
+  vals$sst   = temp[,,1,] # sst (ºC)
+  vals$sbt   = apply(temp, c(1,2,4), .getBottom) # sbt (ºC)
+  # vals$iso15 = calculateIsoline(temp, depth, ref=15) # iso15 (m)
+  vals$sss   = salt[,,1,] # sss (psu)
+  # keep old
+  vals$mlt  = ncvar_get(nc, "mlt") # mlt (m) 
+  vals$mls  = ncvar_get(nc, "mls") # mls (m) 
+  vals$mlp  = ncvar_get(nc, "mlp") # mlp (m) 
+  vals$ssh  = ncvar_get(nc, "ssh") # ssh (m) sea level 
+  vals$u    = ncvar_get(nc, "u")[,,1,] # surface u (m/s) 
+  vals$v    = ncvar_get(nc, "v")[,,1,] # surface v (m/s)
+  vals$taux = ncvar_get(nc, "taux") # taux
+  vals$tauy = ncvar_get(nc, "tauy") # tauy
+  
+  # dimensions
+  dims = nc$dim[unique(unlist(ncvar_dim(nc)))]
+  dims2D = dims[c("longitude", "latitude", "time")]
+  mv = unique(sapply(nc$var, function(x) x$missval))[1]
+  
+  vars = list()
+  vars$sst = ncvar_def(name="sst", longname="Sea surface temperature", 
+                       units="degrees C", dim=dims2D, missval=mv)
+  vars$sbt = ncvar_def(name="sbt", longname="Sea bottom temperature", 
+                       units="degrees C", dim=dims2D, missval=mv)
+  # vars$i15 = ncvar_def(name="i15", longname="Depth of the 15ºC isoline", 
+  # units="meters", dim=dims2D, missval=mv, compression=9)
+  vars$sss = ncvar_def(name="sss", longname="Sea surface salinity", 
+                       units="psu", dim=dims2D, missval=mv)
+  vars$u = ncvar_def(name="u", longname="Surface i-current", 
+                       units="m/s", dim=dims2D, missval=mv)
+  vars$v = ncvar_def(name="v", longname="Surface j-current", 
+                       units="m/s", dim=dims2D, missval=mv)
+  vars = c(vars, nc$var[c("mlt", "mls", "mlp", "ssh", "taux", "tauy")])
+  
+  .setCompression = function(x, compression) {
+    x$compression = compression
+    return(x)
+  }
+  
+  vars = lapply(vars, .setCompression, compression=compression)
+  
+  fileNew = unlist(strsplit(gsub(x=basename(file), patt="(*)\\.nc$", 
+                                 rep=""), "_"))
+  fileNew = append(fileNew, "2D", after=length(fileNew)-1)
+  fileNew = sprintf("%s.nc4", paste(fileNew, collapse="_"))
+  
+  if(!dir.exists(output)) dir.create(output, recursive = TRUE)
+  ncNew = nc_create(filename=file.path(output, fileNew), 
+                    vars=vars, force_v4=TRUE)
+  ivars = names(vars)
+  for(ivar in ivars) ncvar_put(ncNew, ivar, vals[[ivar]]) 
+  nc_close(ncNew)
+  nc_close(nc)
+  
+}
+
+
+# Auxiliar functions ------------------------------------------------------
+
 
 .getBottom = function(x) {
   out = na.omit(x)
   if(length(out)==0) return(NA)
   return(tail(out, 1))
-}
-
-.getBottomC = function(x) {
-  out = na.omit(x)
-  return(length(out))
 }
