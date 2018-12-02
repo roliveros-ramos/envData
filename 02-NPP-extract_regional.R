@@ -10,13 +10,11 @@ library(lubridate)
 algorithms = "vgpm"
 sources = c("s", "m")
 
-path ="input/pp"
-outputDir = "input"
-dx = dy = 1/24
-mx = 24
-xlat = c(-20, 6) + mx*c(-1, +1)*dy
-xlon = c(-93, -70) + mx*c(-1, +1)*dx
-domain = "peru"
+inputDir = "input/npp/9km"
+
+dx = dy = 1/12
+xlon = lon + c(-1, +1)*dx
+xlat = lat + c(-1, +1)*dy
 
 ppVar = "npp"
 missval  = -9999
@@ -24,7 +22,7 @@ longname = "Net primary production"
 prec="float"
 compression = 9
 
-files = dir(path=path, patt="\\.nc4$")
+files = dir(path=inputDir, patt="\\.nc4$")
 
 for(algorithm in algorithms) {
   
@@ -39,14 +37,14 @@ for(algorithm in algorithms) {
     for(i in seq_along(ifiles)) {
       pb <- txtProgressBar(style=3)
       setTxtProgressBar(pb, i/length(ifiles))
-      nc =  nc_open(file.path(path, ifiles[i]))
-      lat = ncvar_get(nc, "lat")
-      lon = ncvar_get(nc, "lon")
-      ilat = isInside(lat, xlat)
-      ilon = isInside(lon, xlon)
+      nc =  nc_open(file.path(inputDir, ifiles[i]))
+      olat = ncvar_get(nc, "lat")
+      olon = ncvar_get(nc, "lon")
+      ilat = isInside(olat, xlat)
+      ilon = isInside(olon, xlon)
       out =  list(npp=ncvar_get(nc, ppVar)[ilon, ilat, ],
                   time=ncvar_get(nc, "time"), 
-                  lat=lat[ilat], lon=lon[ilon], 
+                  lat=olat[ilat], lon=olon[ilon], 
                   att=ncatt_get(nc, ppVar))
       output[[i]] = out
       nc_close(nc)

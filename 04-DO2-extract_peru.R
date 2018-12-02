@@ -2,34 +2,19 @@ require(ncdf4)
 require(kali)
 require(nctools)
 
-inputDir = "raw/oxi_pisces"
-outputDir = "input"
-domain = "peru"
-dx = dy = 1/12
-mx = 12
-lat = c(-20, 6) + mx*c(-1, +1)*dy
-lon =  c(-93, -70) + mx*c(-1, +1)*dx
+inputDir = "input/roms-pisces/RPSoda"
 
-varid = "OXICLINA_MAX"
+dx = dy = 1/6
+xlon = lon + c(-1, +1)*dx
+xlat = lat + c(-1, +1)*dy
 
-filename = file.path(inputDir, dir(path=inputDir))
+varid = "do2"
 
-DateStamp("Processing", varid)
-# modify time
+file = file.path(inputDir, dir(path=inputDir, patt=".*do2.*.nc4$"))
 
-output = basename(gsub(x=filename, patt="peps", rep="peru"))
+DateStamp("Extracting data for", domain)
+output = gsub(x=basename(file), patt="peps", rep=domain)
+nc_subset(filename=file, varid=varid, output=file.path(outputDir, output), 
+          lat=xlat, lon=xlon)
 
-out2 = nc_subset(filename=filename, varid=varid, 
-                 output=file.path(outputDir, output), 
-                 LAT=lat, LON=lon)
-
-out2 = ncdim_rename(out2, old=c("LON", "LAT", "TIME"),
-                    new=c("lon", "lat", "time"))
-
-nc = nc_open(out2, write=TRUE)
-
-nc = ncvar_rename(nc, "OXICLINA_MAX", "do2")
-
-nc_close(nc)
-
-
+DateStamp("Done.")

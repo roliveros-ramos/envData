@@ -8,6 +8,7 @@ years = 1980:2015
 rawDir = "raw/soda"
 outputDir = "input/soda"
 
+
 for(year in years) {
   # add try to all functions!
   DateStamp("Processing year", year)
@@ -17,4 +18,16 @@ for(year in years) {
   cat("File downloaded on", date(), file=file)
   
 }
+
+# vars = c("sst", "sbt", "sss", "mlt")
+# files = dir(path=outputDir)
+# 
+# for(varid in vars) {
+#   
+#   DateStamp("Processing", varid)
+#   output = gsub(x=files[1], patt="2D_[0-9]*", rep=varid)
+#   out1 = nc_rcat(filenames = file.path(inputDir, files), varid=varid,
+#                  output=file.path("input", output))
+#   
+# }
 
